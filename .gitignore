@@ -39,3 +39,11 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# tamagui
+tamagui.generated.css
+.tamagui/
+
+# tests
+test-results/
+playwright-report/
