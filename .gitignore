@@ -47,3 +47,6 @@ tamagui.generated.css
 # tests
 test-results/
 playwright-report/
+
+# docs local
+/docs/local

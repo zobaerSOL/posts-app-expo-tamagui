@@ -1,13 +1,18 @@
 import '../tamagui.generated.css'
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
-import { Stack } from 'expo-router'
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router'
 import { ActivityIndicator, Platform, View } from 'react-native'
-import { TamaguiProvider, YStack } from 'tamagui'
-import { SiteHeader } from '../components/site-header'
+import { TamaguiProvider } from 'tamagui'
+import { AppShell } from '../components/shell/app-shell'
 import { ThemeScope, useThemeScheme } from '../components/theme'
 import { tamaguiConfig } from '../tamagui.config'
 
 const isWeb = Platform.OS === 'web'
+
+// The shell paints the page background (the `canvas` theme key); screens must not cover it with
+// the navigation theme's own background. The theme comes from expo-router, which bundles its own
+// react-navigation: a ThemeProvider from @react-navigation/native does not reach its Stack.
+const navLight = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: 'transparent' } }
+const navDark = { ...DarkTheme, colors: { ...DarkTheme.colors, background: 'transparent' } }
 
 // Shown while a route's loader data loads (native: always on first render). Expo Router renders
 // this OUTSIDE the root layout's component tree, so it must not use Tamagui (no provider here).
@@ -28,40 +33,27 @@ export default function RootLayout() {
       defaultTheme={theme.scheme}
     >
       <ThemeScope value={theme}>
-        <ThemeProvider value={theme.scheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <YStack
-            flex={1}
-            backgroundColor="background"
-          >
-            {isWeb && <SiteHeader />}
-            <Stack screenOptions={{ headerShown: !isWeb }}>
-              <Stack.Screen
-                name="index"
-                options={{ title: 'Home' }}
-              />
-              <Stack.Screen
-                name="posts/index"
-                options={{ title: 'Posts' }}
-              />
-              <Stack.Screen
-                name="posts/[id]"
-                options={{ title: 'Post' }}
-              />
-              <Stack.Screen
-                name="products/index"
-                options={{ title: 'Products' }}
-              />
-              <Stack.Screen
-                name="products/[id]"
-                options={{ title: 'Product' }}
-              />
+        <ThemeProvider value={theme.scheme === 'dark' ? navDark : navLight}>
+          <AppShell>
+            {/* The shell supplies the header (top bar / sidebar); the stack renders bare screens */}
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: 'transparent' },
+              }}
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="posts/index" />
+              <Stack.Screen name="posts/[id]" />
+              <Stack.Screen name="products/index" />
+              <Stack.Screen name="products/[id]" />
               {/* Modal on native; a normal page on web */}
               <Stack.Screen
                 name="user/[id]"
-                options={{ title: 'User', presentation: isWeb ? 'card' : 'modal' }}
+                options={{ presentation: isWeb ? 'card' : 'modal' }}
               />
             </Stack>
-          </YStack>
+          </AppShell>
         </ThemeProvider>
       </ThemeScope>
     </TamaguiProvider>

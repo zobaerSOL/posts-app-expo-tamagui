@@ -1,158 +1,220 @@
-import { Link, useRouter } from 'expo-router'
-import { Platform } from 'react-native'
-import { Button, H1, H3, Image, Paragraph, ScrollView, XStack, YStack } from 'tamagui'
-import { ChevronRight, FileText, ShoppingBag } from '../../components/icons'
-import type { Product } from '../products/api'
-import { ProductGrid } from '../products/product-grid'
+import { type ReactNode, useState } from 'react'
+import { ScrollView, XStack, YStack } from 'tamagui'
+import { LogOut } from '../../components/icons'
+import { Btn, T } from '../../components/hr/ui'
+import { ModalPanel } from '../../components/shell/panels'
+import { useShell } from '../../components/shell/shell-context'
+import type { EmployeeHome, Punch } from './data'
+import { MissedPunchForm } from './missed-punch-form'
+import { PunchCard, workedSeconds } from './punch-card'
+import {
+  Announcements,
+  LeaveBalanceCard,
+  MonthSummary,
+  NextHolidays,
+  PendingRequests,
+  QuickActions,
+} from './sections'
+import {
+  dhakaParts,
+  formatDuration,
+  formatLongDate,
+  formatShortDay,
+  formatTime,
+  greeting,
+  SHIFT,
+} from './time'
+import { useNow } from './use-now'
 
-export function HomeScreen({ products }: { products: Product[] }) {
-  const router = useRouter()
-  const heroImage = products[0]?.thumbnail
+// A grid cell: grows to share the row, wraps onto its own line when narrower than `basis`.
+function Cell({ grow, basis, children }: { grow?: number; basis?: number; children: ReactNode }) {
+  return (
+    <YStack
+      flexGrow={grow ?? 1}
+      flexShrink={1}
+      flexBasis={basis}
+      width={basis ? undefined : '100%'}
+      minWidth={0}
+    >
+      {children}
+    </YStack>
+  )
+}
+
+export function HomeScreen({ data }: { data: EmployeeHome }) {
+  const { toast, openLayer, closeLayer } = useShell()
+  const now = useNow()
+  const secOfDay = now == null ? null : dhakaParts(now).secOfDay
+  const [punch, setPunch] = useState<Punch>(data.punch)
+  const [requests, setRequests] = useState(data.requests)
+  const firstName = data.employee.name.split(' ')[0]
+
+  const checkIn = () => {
+    if (secOfDay == null) return
+    setPunch({ status: 'in', inSec: secOfDay, outSec: null })
+    toast({
+      title: `Checked in at ${formatTime(secOfDay)}`,
+      body: `${data.shift.branch} · office network`,
+    })
+  }
+
+  const undoCheckOut = () => {
+    setPunch((p) => ({ ...p, status: 'in', outSec: null }))
+    toast({ title: 'Check-out undone', body: 'You’re still checked in.' })
+  }
+
+  const confirmCheckOut = (sec: number) => {
+    setPunch((p) => ({ ...p, status: 'done', outSec: sec }))
+    closeLayer()
+    toast({
+      title: `Checked out at ${formatTime(sec)}`,
+      body:
+        sec < SHIFT.endSec
+          ? 'Early Leave recorded. Your manager can see it in team attendance.'
+          : undefined,
+      action: { label: 'Undo check-out', onPress: undoCheckOut },
+    })
+  }
+
+  const askCheckOut = () => {
+    if (secOfDay == null) return
+    const sec = secOfDay
+    const early = sec < SHIFT.endSec
+    openLayer(
+      'modal',
+      <ModalPanel
+        title={`Check out at ${formatTime(sec)}?`}
+        Icon={LogOut}
+        tone="warn"
+        footer={
+          <>
+            <Btn onPress={closeLayer}>Keep working</Btn>
+            <Btn
+              variant="primary"
+              Icon={LogOut}
+              onPress={() => confirmCheckOut(sec)}
+            >
+              Check out now
+            </Btn>
+          </>
+        }
+      >
+        <T c="ink2">
+          You’ve worked <T w="700">{formatDuration(workedSeconds(punch, sec))}</T> of your 9h 00m
+          shift.
+          {early
+            ? ' Checking out before 06:00 PM marks today as Early Leave (and Half-Day under 4h 30m) unless a correction is approved.'
+            : ''}
+        </T>
+      </ModalPanel>
+    )
+  }
+
+  const askMissedPunch = () => {
+    openLayer(
+      'drawer',
+      <MissedPunchForm
+        dateLabel={now == null ? '' : formatLongDate(now)}
+        onSubmit={(_reason, missing) => {
+          setRequests((r) => [
+            {
+              id: `MP-${Date.now()}`,
+              kind: 'punch',
+              title: `Missed punch · ${now == null ? 'today' : formatShortDay(now)} (${missing.toLowerCase()})`,
+              sub: 'Step 1 of 2 · with Mehedi Hasan',
+              status: 'pending',
+            },
+            ...r,
+          ])
+          closeLayer()
+          toast({
+            title: 'Missed-punch request sent',
+            body: 'Mehedi Hasan usually responds within a day.',
+          })
+        }}
+      />
+    )
+  }
 
   return (
     <ScrollView>
       <YStack
-        padding="4"
-        gap="6"
-        maxWidth={1100}
+        padding="4 md:5 lg:6"
+        gap="4 lg:5"
+        maxWidth={1600}
         width="100%"
         alignSelf="center"
       >
-        <XStack
-          backgroundColor="blue3"
-          borderRadius="6"
-          overflow="hidden"
-          alignItems="center"
-          padding="5 sm:8"
-          gap="4"
-        >
-          <YStack
-            flex={1}
-            gap="4"
+        <YStack>
+          <T
+            s={24}
+            lh={32}
+            w="600"
+            role="heading"
+            aria-level={1}
           >
-            <Paragraph
-              color="blue10"
-              fontWeight="800"
-              size="2"
-              textTransform="uppercase"
-            >
-              New season sale
-            </Paragraph>
-            <H1 size="9 sm:11">Everything you need, delivered.</H1>
-            <Paragraph
-              size="5"
-              opacity={0.75}
-              maxWidth={480}
-            >
-              Browse our catalog of beauty, fragrances, furniture and groceries. Up to 20% off this
-              week.
-            </Paragraph>
-            <XStack
-              gap="3"
-              flexWrap="wrap"
-            >
-              <Button
-                theme="blue"
-                size="lg"
-                onPress={() => router.push('/products')}
-              >
-                Shop now
-              </Button>
-              <Button
-                size="lg"
-                onPress={() => router.push('/posts')}
-              >
-                Read the blog
-              </Button>
-            </XStack>
-          </YStack>
-          {heroImage ? (
-            <YStack
-              display="none sm:flex"
-              width={220}
-              height={220}
-            >
-              <Image
-                src={heroImage}
-                alt=""
-                width="100%"
-                height="100%"
-                objectFit="contain"
-              />
-            </YStack>
-          ) : null}
-        </XStack>
-
-        {/* Native has no header nav, so offer the same destinations here */}
-        {Platform.OS !== 'web' && (
-          <YStack gap="2">
-            <QuickLink
-              href="/products"
-              title="Products"
-              Icon={ShoppingBag}
-            />
-            <QuickLink
-              href="/posts"
-              title="Posts"
-              Icon={FileText}
-            />
-          </YStack>
-        )}
-
-        <YStack gap="3">
-          <XStack
-            justifyContent="space-between"
-            alignItems="center"
-          >
-            <H3>Featured products</H3>
-            <Link href="/products">
-              <Paragraph
-                color="blue10"
-                fontWeight="700"
-              >
-                View all
-              </Paragraph>
-            </Link>
-          </XStack>
-          <ProductGrid products={products} />
+            {secOfDay == null ? 'Hello' : greeting(secOfDay)}, {firstName}
+          </T>
+          <T c="muted">
+            {data.employee.designation} · {data.employee.department} · {data.employee.code}
+          </T>
         </YStack>
+
+        <XStack
+          flexWrap="wrap"
+          gap="4 lg:5"
+        >
+          <Cell
+            grow={2}
+            basis={520}
+          >
+            <PunchCard
+              punch={punch}
+              shift={data.shift}
+              now={now}
+              secOfDay={secOfDay}
+              onCheckIn={checkIn}
+              onCheckOut={askCheckOut}
+            />
+          </Cell>
+          <Cell
+            grow={1}
+            basis={300}
+          >
+            <LeaveBalanceCard
+              balances={data.leaveBalances}
+              leaveYear={data.leaveYear}
+            />
+          </Cell>
+          <Cell>
+            <QuickActions onMissedPunch={askMissedPunch} />
+          </Cell>
+          <Cell
+            grow={7}
+            basis={420}
+          >
+            <PendingRequests requests={requests} />
+          </Cell>
+          <Cell
+            grow={5}
+            basis={320}
+          >
+            <MonthSummary month={data.month} />
+          </Cell>
+          <Cell
+            grow={7}
+            basis={420}
+          >
+            <Announcements items={data.announcements} />
+          </Cell>
+          <Cell
+            grow={5}
+            basis={320}
+          >
+            <NextHolidays holidays={data.holidays} />
+          </Cell>
+        </XStack>
       </YStack>
     </ScrollView>
-  )
-}
-
-function QuickLink({
-  href,
-  title,
-  Icon,
-}: { href: '/products' | '/posts'; title: string; Icon: typeof ShoppingBag }) {
-  return (
-    <Link
-      href={href}
-      asChild
-    >
-      <XStack
-        render="a"
-        gap="3"
-        padding="3"
-        alignItems="center"
-        borderWidth={1}
-        borderColor="borderColor"
-        borderRadius="4"
-        backgroundColor="transparent press:backgroundPress"
-      >
-        <Icon size={22} />
-        <Paragraph
-          flex={1}
-          fontWeight="700"
-        >
-          {title}
-        </Paragraph>
-        <ChevronRight
-          size={18}
-          opacity={0.5}
-        />
-      </XStack>
-    </Link>
   )
 }

@@ -6,6 +6,8 @@ This is a pilot, not production code. It rebuilds the Next.js + Solito + Tamagui
 
 ## Screenshots
 
+Captured on 2026-11-06 with the SOL HR shell (`components/shell/`) around every route.
+
 ### Web (Expo Router, 1280×800)
 
 | Home | Posts |
@@ -16,15 +18,19 @@ This is a pilot, not production code. It rebuilds the Next.js + Solito + Tamagui
 | **Product detail** | |
 | ![Web product detail](docs/screenshots/web-product-detail.png) | |
 
-Captured from the production export served by `expo serve`.
+Captured with Chrome from the production export (`npm run build:web`, then `expo serve --port 3100`).
 
-### iOS (Expo Go 58.0.7, iPhone 15 Pro simulator)
+### iOS (Expo Go 58.0.7, iPhone 15 Pro simulator, iOS 17.4)
 
-| Posts | Post detail | Products | Product detail |
-| --- | --- | --- | --- |
-| <img src="docs/screenshots/ios-posts.png" width="220" alt="iOS posts"> | <img src="docs/screenshots/ios-post-detail.png" width="220" alt="iOS post detail"> | <img src="docs/screenshots/ios-products.png" width="220" alt="iOS products"> | <img src="docs/screenshots/ios-product-detail.png" width="220" alt="iOS product detail"> |
+| Home | Posts | Post detail | Products | Product detail |
+| --- | --- | --- | --- | --- |
+| <img src="docs/screenshots/ios-home.png" width="180" alt="iOS home"> | <img src="docs/screenshots/ios-posts.png" width="180" alt="iOS posts"> | <img src="docs/screenshots/ios-post-detail.png" width="180" alt="iOS post detail"> | <img src="docs/screenshots/ios-products.png" width="180" alt="iOS products"> | <img src="docs/screenshots/ios-product-detail.png" width="180" alt="iOS product detail"> |
 
-The same screen components render on every platform. Web adds a custom header (`components/site-header.tsx`), and native uses the Stack header.
+Captured with `xcrun simctl io booted screenshot` against the Metro dev server (`expo start`), opening each route with an `exp://127.0.0.1:8081/--/<route>` deep link.
+
+The same screen components render on every platform. Web at 1280px gets the sidebar layout. On the phone the shell switches to the top bar with a menu button plus bottom tabs, and Posts and Products sit under the sidebar's "Demo APIs" group (reached from the menu).
+
+On iOS the home screen scrolls through every card (punch clock, leave balance, quick actions, pending requests, month summary, announcements, holidays), the top bar shows the notification count and the "NJ" avatar, and lists stop above the bottom tabs.
 
 ## Tech stack
 
@@ -63,16 +69,11 @@ Numbers come from single runs on one machine. See [`docs/pilot-report.md`](docs/
 
 ### Cons
 
-- **A production server is required.** `output: "server"` needs a Node or edge host (Expo Hosting, Express, Cloudflare, Vercel, Netlify or Bun adapters). Static and server output cannot be mixed in one project, and there is no ISR or tag-based cache invalidation (loaders only offer `Cache-Control` headers).
-- **Native depends on the deployed server.** Native loaders call the Expo server, so a production native build needs it reachable. The reference's native app fetches the APIs directly.
+- **No per-route rendering or ISR.** Static and server output cannot be mixed in one project, and there is no ISR or tag-based cache invalidation (loaders only offer `Cache-Control` headers).
 - **Heavier client.** About 697 KB of compressed JS vs 302 KB (2.3x), and about 3x the Total Blocking Time (292-301 ms vs 85-126 ms). The pilot still paints earlier (FCP about 930 ms vs 1,057 ms).
 - **`expo serve` does not compress.** Behind no proxy, Lighthouse performance was 65-69 and JS was 2,701 KB. A real host or CDN would normally compress, but you must check yours.
-- **The 404 body is plain text.** A loader that throws `StatusError(404)` returns the right status with a `text/plain` body, not the styled page. In `expo start` the same route returns 500.
-- **Tamagui's Metro plugin breaks dev SSR.** `withTamagui` from `@tamagui/cli/metro` made every route after the first fail with `Requiring unknown module`. It is left out, so the Tamagui compiler is not used (cause not found, see gap 2 in the report).
-- **Double upstream fetch on detail pages.** `generateMetadata` cannot see loader data, so each detail page calls the API twice per request until a per-request cache is added.
 - **Tamagui 3 is a breaking upgrade.** Bare tokens, string clauses for media and state, `render` instead of `tag`, and no icon package. Porting from the reference's Tamagui 2 means rewriting the screens.
 - **Extra generate step.** `tamagui generate-css` must run before dev and build, and the 700 KB output is gitignored.
-- **Not evaluated:** Android, INP, real devices, load testing, the Tamagui compiler, and a static-output variant.
 
 ### Cons of the reference stack: solved here or not
 
@@ -87,19 +88,14 @@ Each row is a con from the reference README (`~/Documents/vsCodeProjects/posts-a
 | Duplicated routing and data layers (web route, native route, native fetch wrapper per feature) | **Solved** | One route tree in `app/`. Each route has one `loader` that serves web and native, so there is no second fetch layer. 100% of counted code is shared by file (reference 81.4%). |
 | Type errors do not fail the web build (`ignoreBuildErrors: true`) | **Solved** | There is no setting that hides errors, and strict `tsc --noEmit` passes. Type checking is still a separate step (`npm run typecheck`). I did not check whether `expo export` runs `tsc` itself. |
 | Monorepo overhead (version matching, rebuilding `@my/ui` and `@my/config`, slow tests) | **Solved** | One `package.json`, one `tsconfig`, no workspace packages to rebuild. Vitest unit tests do not spawn a framework server. `npm run test:e2e` still builds and serves the production export (about 23 s cold build). |
-| Native development friction (Expo Go must match the SDK, `expo-dev-client`) | **Not solved** | `expo-dev-client` is not installed, so `expo start --ios` uses Expo Go. But Expo Go must still match SDK 58. The simulator had SDK 54 and the app refused to open until Expo Go 58.0.7 was installed. The first `simctl openurl` can also time out while the simulator warms up. |
 
 #### Still present or new in this pilot
 
 These are not in the reference's cons list, or only partly:
 
-- **Dev and production behave differently.** A missing item returns 404 in production but 500 in `expo start`. Tamagui's Metro plugin works in the production export but breaks dev SSR.
-- **A production server is now required** (`web.output: "server"`), and native loaders depend on it. The reference's native app fetches the APIs directly.
 - **Heavier client JS** (697 KB vs 302 KB compressed) and no Tamagui compiler, so the style extraction the reference gets from `yarn web:prod` is missing.
-- **Plain-text 404 body** from a loader's `StatusError(404)`, where Next.js renders a styled page.
 - **Tamagui 3 API break.** The reference's screens had to be ported (bare tokens, string clauses, `render` instead of `tag`, no icon package).
 - **Extra step:** `tamagui generate-css` must run before dev and build.
-- **Double upstream fetch** on detail pages, because `generateMetadata` cannot see loader data.
 
 ### When this stack is a good fit
 
@@ -111,7 +107,7 @@ You want one codebase and one router for web and native, and the web side is a c
 app/             Expo Router routes (loader, generateMetadata, ErrorBoundary per route)
   posts/ products/ user/
 features/        home, posts, products, user, shared (screens and api.ts)
-components/      site-header, theme, generated icons
+components/      shell (sidebar, top bar, tabs), hr (tokens, UI kit), theme, generated icons
 e2e/             Playwright specs (run against the production build)
 tests/           Vitest unit tests
 scripts/         check-html.sh (status, title, description of every route)

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 const routes: [path: string, heading: RegExp | string][] = [
-  ['/', 'Everything you need, delivered.'],
+  ['/', /, Nusrat$/],
   ['/posts', 'Posts'],
   ['/posts/1', /sunt aut facere repellat/],
   ['/products', 'All products'],
@@ -37,7 +37,7 @@ test.describe('dark OS color scheme', () => {
       page.on('pageerror', (e) => errors.push(e.message))
       page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
       await page.goto(path)
-      await expect(page.getByRole('button', { name: 'Theme: dark' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Switch to light mode' })).toBeVisible()
       await page.waitForLoadState('networkidle')
       expect(errors).toEqual([])
     })

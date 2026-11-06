@@ -1,6 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { Platform, useColorScheme } from 'react-native'
-import { Button } from 'tamagui'
 
 type Scheme = 'light' | 'dark'
 type ThemeContextValue = { scheme: Scheme; toggle: () => void }
@@ -32,7 +31,6 @@ export function ThemeScope({ value, children }: { value: ThemeContextValue; chil
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
-export function SwitchThemeButton() {
-  const { scheme, toggle } = useContext(ThemeContext)
-  return <Button onPress={toggle}>Theme: {scheme}</Button>
+export function useThemeContext(): ThemeContextValue {
+  return useContext(ThemeContext)
 }
